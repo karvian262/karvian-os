@@ -144,6 +144,12 @@ await new Promise((resolve) => setTimeout(resolve, 60000));
         { status: 500 }
       );
     }
+    await supabaseAdmin.from("media_posts").insert({
+  platform: "Instagram",
+  title: fileName,
+  instagram_media_id: publishData.id,
+  instagram_url: `https://www.instagram.com/reel/${publishData.id}/`,
+});
 
     return NextResponse.json({
   success: true,
