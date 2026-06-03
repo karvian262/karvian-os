@@ -146,10 +146,12 @@ await new Promise((resolve) => setTimeout(resolve, 60000));
     }
 
     return NextResponse.json({
-      message: "Instagram Reel published successfully",
-      instagramMediaId: publishData.id,
-      publicVideoUrl,
-    });
+  success: true,
+  message: "Instagram Reel published successfully",
+  instagramMediaId: publishData.id,
+  instagramUrl: `https://www.instagram.com/reel/${publishData.id}/`,
+  publicVideoUrl,
+});
   } catch (error) {
     return NextResponse.json(
       {
