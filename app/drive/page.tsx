@@ -11,6 +11,15 @@ type DriveFile = {
   iconLink?: string;
 };
 
+type UploadTask = {
+  id: number;
+  fileName: string;
+  thumbnail?: string;
+  platform: string;
+  progress: number;
+  status: "uploading" | "done" | "failed";
+};
+
 export default function DrivePage() {
   const [userEmail, setUserEmail] = useState("");
   const [view, setView] = useState<"home" | "driveRoot" | "files">("home");
@@ -28,6 +37,8 @@ export default function DrivePage() {
   const [caption, setCaption] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
 
   useEffect(() => {
     getUser();
@@ -111,7 +122,8 @@ export default function DrivePage() {
     });
 
     const text = await res.text();
-const data = text ? JSON.parse(text) : {};
+    const data = text ? JSON.parse(text) : {};
+
     setCaption(data.caption || "");
     setIsGeneratingCaption(false);
   }
@@ -145,97 +157,196 @@ const data = text ? JSON.parse(text) : {};
   }
 
   async function postNow() {
-  if (!selectedFile) return;
+    if (!selectedFile) return;
 
-  const { data } = await supabase.auth.getSession();
-  const providerToken = data.session?.provider_token;
+    const fileToPost = selectedFile;
+    const platformToPost = selectedPlatform;
+    const taskId = Date.now();
 
-  if (!providerToken) {
-    alert("No Google token found. Login again with YouTube permission.");
-    return;
-  }
+    setPosting(true);
 
-  let youtubeVideoId = null;
-  let youtubeUrl = null;
-
-  if (selectedPlatform === "YouTube") {
-    const res = await fetch("/api/youtube", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        accessToken: providerToken,
-        fileId: selectedFile.id,
-        fileName: selectedFile.name,
-        caption,
+    setUploadTasks((prev) => [
+      ...prev,
+      {
+        id: taskId,
+        fileName: fileToPost.name,
+        thumbnail: fileToPost.thumbnailLink,
+        platform: platformToPost,
         postType,
-      }),
-    });
+        progress: 0,
+        status: "uploading",
+      },
+    ]);
 
-    const uploadData = await res.json();
+    setSelectedFile(null);
 
-    if (!res.ok) {
-      alert(uploadData.error || "YouTube upload failed");
-      console.log(uploadData);
-      return;
-    }
+    const progressInterval = setInterval(() => {
+  setUploadTasks((prev) =>
+    prev.map((task) =>
+      task.id === taskId && task.progress < 90
+        ? { ...task, progress: task.progress + 1 }
+        : task
+    )
+  );
+}, 1500);
 
-    youtubeVideoId = uploadData.videoId;
-    youtubeUrl = uploadData.videoUrl;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const providerToken = data.session?.provider_token;
 
-    alert(`${uploadData.message}\n${uploadData.videoUrl}`);
-  }
-  if (selectedPlatform === "Instagram") {
-  const res = await fetch("/api/instagram/publish", {
+      if (!providerToken) {
+        alert("No Google token found. Login again with YouTube permission.");
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId ? { ...task, status: "failed" } : task
+          )
+        );
+        return;
+      }
+
+      let youtubeVideoId = null;
+      let youtubeUrl = null;
+
+      if (platformToPost === "YouTube") {
+        const res = await fetch("/api/youtube", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            accessToken: providerToken,
+            fileId: fileToPost.id,
+            fileName: fileToPost.name,
+            caption,
+            postType,
+          }),
+        });
+
+        const uploadData = await res.json();
+
+        if (!res.ok) {
+          alert(uploadData.error || "YouTube upload failed");
+          console.log(uploadData);
+          setUploadTasks((prev) =>
+            prev.map((task) =>
+              task.id === taskId ? { ...task, status: "failed" } : task
+            )
+          );
+          return;
+        }
+
+        youtubeVideoId = uploadData.videoId;
+        youtubeUrl = uploadData.videoUrl;
+
+        alert(`${uploadData.message}\n${uploadData.videoUrl}`);
+      }
+
+      if (platformToPost === "Instagram") {
+        const res = await fetch("/api/instagram/publish", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            accessToken: providerToken,
+            fileId: fileToPost.id,
+            fileName: fileToPost.name,
+            caption,
+          }),
+        });
+
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : {};
+
+        if (!res.ok) {
+          alert(data.error || "Instagram publish failed");
+          console.log(data);
+          setUploadTasks((prev) =>
+            prev.map((task) =>
+              task.id === taskId ? { ...task, status: "failed" } : task
+            )
+          );
+          return;
+        }
+
+        alert(data.message || "Instagram Reel published successfully");
+      }
+if (platformToPost === "Facebook") {
+  const res = await fetch("/api/facebook/publish", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-  accessToken: providerToken,
-  fileId: selectedFile.id,
-  fileName: selectedFile.name,
-  caption,
-}),
+      accessToken: providerToken,
+      fileId: fileToPost.id,
+      fileName: fileToPost.name,
+      caption,
+    }),
   });
 
   const text = await res.text();
-const data = text ? JSON.parse(text) : {};
+  const data = text ? JSON.parse(text) : {};
 
   if (!res.ok) {
-    alert(data.error || "Instagram publish failed");
+    alert(data.error || "Facebook publish failed");
+    console.log(data);
+    setUploadTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? { ...task, status: "failed" } : task
+      )
+    );
     return;
   }
 
-  alert(data.message);
+  alert(data.message || "Facebook video published successfully");
 }
+      const { error } = await supabase.from("media_posts").insert([
+        {
+          drive_file_id: fileToPost.id,
+          file_name: fileToPost.name,
+          file_type: fileToPost.mimeType,
+          platform: platformToPost,
+          post_type: postType,
+          caption,
+          scheduled: false,
+          status: "posted",
+          youtube_video_id: youtubeVideoId,
+          youtube_url: youtubeUrl,
+        },
+      ]);
 
-  const { error } = await supabase.from("media_posts").insert([
-    {
-      drive_file_id: selectedFile.id,
-      file_name: selectedFile.name,
-      file_type: selectedFile.mimeType,
-      platform: selectedPlatform,
-      post_type: postType,
-      caption,
-      scheduled: false,
-      status: "posted",
-      youtube_video_id: youtubeVideoId,
-      youtube_url: youtubeUrl,
-    },
-  ]);
+      if (error) {
+        alert("Failed to mark as posted");
+        console.log(error);
+        setUploadTasks((prev) =>
+          prev.map((task) =>
+            task.id === taskId ? { ...task, status: "failed" } : task
+          )
+        );
+        return;
+      }
 
-  if (error) {
-    alert("Failed to mark as posted");
-    console.log(error);
-    return;
+      await getScheduledPosts();
+
+      setUploadTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? { ...task, progress: 100, status: "done" }
+            : task
+        )
+      );
+      new Audio("/notification.mp3").play().catch(() => {});
+      setTimeout(() => {
+  setUploadTasks((prev) =>
+    prev.filter((task) => task.id !== taskId)
+  );
+}, 3000);
+    } finally {
+      clearInterval(progressInterval);
+      setPosting(false);
+    }
   }
-
-  await getScheduledPosts();
-  alert(`Marked as posted on ${selectedPlatform}`);
-  setSelectedFile(null);
-}
 
   async function cancelSchedule(postId: number) {
     const { error } = await supabase
@@ -277,33 +388,33 @@ const data = text ? JSON.parse(text) : {};
                 </p>
 
                 <div className="mt-5 flex gap-3">
-  <button
-    onClick={async () => {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: "http://localhost:3000/drive",
-          scopes:
-            "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/youtube.upload",
-          queryParams: {
-            prompt: "consent select_account",
-            access_type: "offline",
-          },
-        },
-      });
-    }}
-    className="rounded-xl border border-white/10 px-5 py-3 text-gray-300 hover:bg-white/10"
-  >
-    Connect Drive
-  </button>
+                  <button
+                    onClick={async () => {
+                      await supabase.auth.signInWithOAuth({
+                        provider: "google",
+                        options: {
+                          redirectTo: "http://localhost:3000/drive",
+                          scopes:
+                            "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/youtube.upload",
+                          queryParams: {
+                            prompt: "consent select_account",
+                            access_type: "offline",
+                          },
+                        },
+                      });
+                    }}
+                    className="rounded-xl border border-white/10 px-5 py-3 text-gray-300 hover:bg-white/10"
+                  >
+                    Connect Drive
+                  </button>
 
-  <button
-    onClick={() => setView("driveRoot")}
-    className="rounded-xl bg-white px-5 py-3 font-medium text-black hover:bg-gray-200"
-  >
-    Drive Sync
-  </button>
-</div>
+                  <button
+                    onClick={() => setView("driveRoot")}
+                    className="rounded-xl bg-white px-5 py-3 font-medium text-black hover:bg-gray-200"
+                  >
+                    Drive Sync
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -534,6 +645,60 @@ const data = text ? JSON.parse(text) : {};
         )}
       </div>
 
+      {uploadTasks.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-[999] flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          {uploadTasks.map((task) => (
+            <div
+              key={task.id}
+              className="w-80 rounded-3xl border border-white/10 bg-[#111111] p-4 text-white shadow-2xl"
+            >
+              <div className="flex gap-3">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-black/30">
+                  {task.thumbnail ? (
+                    <img
+                      src={task.thumbnail}
+                      alt={task.fileName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-gray-500">
+                      VIDEO
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {task.fileName}
+                  </p>
+
+                  <p className="mt-1 text-xs text-gray-400">
+  {task.platform} • {task.postType} •{" "}
+  {task.status === "done"
+    ? "Published"
+    : task.status === "failed"
+    ? "Failed"
+    : "Uploading"}
+</p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        task.status === "failed" ? "bg-red-500" : "bg-green-500"
+                      }`}
+                      style={{ width: `${task.progress}%` }}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-xs text-gray-500">
+                    {task.progress}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {selectedFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
           <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-[#111111] p-8">
@@ -562,23 +727,23 @@ const data = text ? JSON.parse(text) : {};
               <div>
                 <p className="mb-2 text-sm text-gray-400">Post Type</p>
                 <select
-  value={postType}
-  onChange={(e) => setPostType(e.target.value)}
-  className="w-full rounded-2xl border border-white/10 bg-black/30 p-4 text-white"
->
-  {selectedPlatform === "YouTube" ? (
-    <>
-      <option>Video</option>
-      <option>Short</option>
-    </>
-  ) : (
-    <>
-      <option>Reel</option>
-      <option>Story</option>
-      <option>Post</option>
-    </>
-  )}
-</select>
+                  value={postType}
+                  onChange={(e) => setPostType(e.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-black/30 p-4 text-white"
+                >
+                  {selectedPlatform === "YouTube" ? (
+                    <>
+                      <option>Video</option>
+                      <option>Short</option>
+                    </>
+                  ) : (
+                    <>
+                      <option>Reel</option>
+                      <option>Story</option>
+                      <option>Post</option>
+                    </>
+                  )}
+                </select>
               </div>
 
               <div>
@@ -619,13 +784,12 @@ const data = text ? JSON.parse(text) : {};
                 >
                   Save Schedule
                 </button>
-
-                <button
-                  onClick={postNow}
-                  className="rounded-2xl bg-green-500 py-4 font-semibold text-black"
-                >
-                  Post Now
-                </button>
+<button
+  onClick={postNow}
+  className="rounded-2xl bg-green-500 py-4 font-semibold text-black"
+>
+  Post Now
+</button>
               </div>
             </div>
           </div>

@@ -33,7 +33,7 @@ const platforms = [
     type: "Visual Discovery",
     icon: "P",
     color: "text-red-600",
-    method: "Connect with Pinterest",
+    method: "Coming Soon",
     note: "For pins and visual content.",
   },
   {
@@ -41,7 +41,7 @@ const platforms = [
     type: "Text + Media",
     icon: "𝕏",
     color: "text-white",
-    method: "Connect with X",
+    method: "Coming Soon",
     note: "For text posts, images and videos.",
   },
   {
@@ -49,7 +49,7 @@ const platforms = [
     type: "Business Platform",
     icon: "in",
     color: "text-blue-400",
-    method: "Connect with LinkedIn",
+    method: "Coming Soon",
     note: "For creators, founders and company pages.",
   },
   {
@@ -57,7 +57,7 @@ const platforms = [
     type: "Messaging",
     icon: "☏",
     color: "text-green-500",
-    method: "Connect Phone Number",
+    method: "Coming Soon",
     note: "For broadcasts, campaigns and customer updates.",
   },
   {
@@ -65,7 +65,7 @@ const platforms = [
     type: "Community",
     icon: "✈",
     color: "text-sky-500",
-    method: "Connect Bot / Channel",
+    method: "Coming Soon",
     note: "For channel announcements and communities.",
   },
   {
@@ -73,7 +73,7 @@ const platforms = [
     type: "Short Video",
     icon: "M",
     color: "text-orange-500",
-    method: "Partner API Later",
+    method: "Coming Soon",
     note: "Short-video publishing support planned.",
   },
 ];
@@ -120,18 +120,19 @@ export default function PlatformsPage() {
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     const redirectUri = process.env.NEXT_PUBLIC_META_REDIRECT_URI;
 
-    const scope = "public_profile";
+   
 
     const metaUrl =
-      `https://www.facebook.com/v21.0/dialog/oauth` +
-      `?client_id=${appId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri || "")}` +
-      `&scope=${encodeURIComponent(scope)}` +
-      `&response_type=code` +
-`&state=${encodeURIComponent(platformName)}`;
+  `https://www.facebook.com/v21.0/dialog/oauth` +
+  `?client_id=${appId}` +
+  `&redirect_uri=${encodeURIComponent(redirectUri || "")}` +
+  `&response_type=code` +
+  `&config_id=2458975511286805` +
+  `&state=${encodeURIComponent(platformName)}`;
 
-    window.location.href = metaUrl;
-    return;
+console.log("META URL:", metaUrl);
+window.location.assign(metaUrl);
+return;
   }
 
   alert(`${platformName} real connection will be added later.`);
@@ -220,20 +221,27 @@ export default function PlatformsPage() {
               </div>
 
               {connection ? (
-                <button
-                  onClick={() => disconnectPlatform(platform.name)}
-                  className="mt-5 w-full rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-medium text-red-300 hover:bg-red-500/20"
-                >
-                  Disconnect
-                </button>
-              ) : (
-                <button
-                  onClick={() => connectPlatform(platform.name)}
-                  className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-medium text-black hover:bg-gray-200"
-                >
-                  {platform.method}
-                </button>
-              )}
+  <button
+    onClick={() => disconnectPlatform(platform.name)}
+    className="mt-5 w-full rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-medium text-red-300 hover:bg-red-500/20"
+  >
+    Disconnect
+  </button>
+) : platform.method === "Coming Soon" ? (
+  <button
+    disabled
+    className="mt-5 w-full cursor-not-allowed rounded-xl bg-gray-700 px-4 py-3 font-medium text-gray-400"
+  >
+    Coming Soon
+  </button>
+) : (
+  <button
+    onClick={() => connectPlatform(platform.name)}
+    className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-medium text-black hover:bg-gray-200"
+  >
+    {platform.method}
+  </button>
+)}
             </div>
           );
         })}

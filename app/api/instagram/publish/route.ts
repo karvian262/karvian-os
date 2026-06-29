@@ -115,7 +115,7 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-await new Promise((resolve) => setTimeout(resolve, 60000));
+await new Promise((resolve) => setTimeout(resolve, 120000));
     const publishRes = await fetch(
       `https://graph.instagram.com/v25.0/${igAccountId}/media_publish`,
       {

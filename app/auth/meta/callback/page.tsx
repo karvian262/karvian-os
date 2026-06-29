@@ -37,15 +37,17 @@ export default function MetaCallbackPage() {
         return;
       }
 
-      await supabase.from("connected_platforms").insert([
-        {
-          user_id: user.id,
-          platform: platform,
-          account_name: "Meta connected account",
-          connected: true,
-          access_token: tokenData.access_token,
-        },
-      ]);
+      await supabase.from("connected_platforms").upsert([
+  {
+    user_id: user.id,
+    platform: platform,
+    account_name: tokenData.page_name || "Meta connected account",
+    connected: true,
+    access_token: tokenData.access_token,
+    ...(tokenData.facebook_page_id && { facebook_page_id: tokenData.facebook_page_id }),
+    ...(tokenData.facebook_page_token && { facebook_page_token: tokenData.facebook_page_token }),
+  },
+]);
     }
 
     router.push("/platforms");
