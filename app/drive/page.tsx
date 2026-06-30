@@ -16,6 +16,7 @@ type UploadTask = {
   fileName: string;
   thumbnail?: string;
   platform: string;
+  postType: string;
   progress: number;
   status: "uploading" | "done" | "failed";
 };
