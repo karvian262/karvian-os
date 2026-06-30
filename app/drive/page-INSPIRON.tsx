@@ -673,7 +673,7 @@ if (platformToPost === "Facebook") {
                   </p>
 
                   <p className="mt-1 text-xs text-gray-400">
-  {task.platform} • {task.postType} •{" "}
+  {task.platform} •{" "}
   {task.status === "done"
     ? "Published"
     : task.status === "failed"
